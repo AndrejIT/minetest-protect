@@ -2,7 +2,7 @@
 -- based on glomie's mod of the same name
 -- Released under WTFPL
 -- Andrey added some changes to fit survival world needs
--- Doors and signs needs testing. Chest protection too complicated. bucket protection added
+-- Doors and signs needs testing. Chest protection too complicated. bucket protection added. screwdriver protection.
 
 -- FIXME: use a mesh instead of the buggy wielditem, for protector:display
 -- but that isn't possible yet since models won't take care of the texture's alpha channel...
@@ -191,6 +191,33 @@ minetest.registered_nodes["doors:door_wood_t_2"].on_rightclick=function(pos, nod
 		return old_doors_on_rightclick_t_2(pos, node, clicker)
 	else
 		return
+	end
+end
+--shaking the bag with screwdriver
+local old_screwdriver_on_use=minetest.registered_tools["screwdriver:screwdriver"].on_use
+minetest.registered_tools["screwdriver:screwdriver"].on_use=function(itemstack, user, pointed_thing)
+	local pos = pointed_thing.under
+	if pos==nil then
+		return itemstack
+	end
+	if protector.can_dig(3,pos,user) then
+		return old_screwdriver_on_use(itemstack, user, pointed_thing)
+	else
+		return itemstack
+	end
+end
+for i = 1, 4 do
+	local old_screwdriver_on_use=minetest.registered_tools["screwdriver:screwdriver"..i].on_use
+	minetest.registered_tools["screwdriver:screwdriver"..i].on_use=function(itemstack, user, pointed_thing)
+		local pos = pointed_thing.under
+		if pos==nil then
+			return itemstack
+		end
+		if protector.can_dig(3,pos,user) then
+			return old_screwdriver_on_use(itemstack, user, pointed_thing)
+		else
+			return itemstack
+		end
 	end
 end
 --duck punching with bucket
