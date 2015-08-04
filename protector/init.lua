@@ -1,8 +1,8 @@
 -- Zeg9's protector mod
 -- based on glomie's mod of the same name
 -- Released under WTFPL
--- Andrey added some changes to fit his survival world needs. Changed class name back to "protector"
--- Doors and signs needs testing. Chest protection too complicated. bucket protection added. screwdriver protection.
+-- Andrey added some changes to fit his survival world needs.
+-- protects against placing tnt near protected area.
 
 -- FIXME: use a mesh instead of the buggy wielditem, for protector_mese:display
 -- but that isn't possible yet since models won't take care of the texture's alpha channel...
@@ -11,12 +11,13 @@
 minetest.register_privilege("delprotect","Delete other's protection by sneaking")
 
 protector = {}
+protector.cache = {}
 protector.radius = (tonumber(minetest.setting_get("protector_radius")) or 3)
 
-protector.node = "protector:protect"
-protector.display = "protector:display"
-protector.display_node = "protector:display_node"
-protector.item = "protector:stick"
+protector.node = "protector_mese:protect"
+protector.display = "protector_mese:display"
+protector.display_node = "protector_mese:display_node"
+protector.item = "protector_mese:stick"
 
 protector.get_member_list = function(meta)
 	local s = meta:get_string("members")
@@ -154,122 +155,148 @@ minetest.registered_nodes["default:sign_wall"].on_receive_fields=function(pos, f
 		return true
 	end
 end
---duck punching
-local old_doors_on_place=minetest.registered_craftitems["doors:door_wood"].on_place
-minetest.registered_craftitems["doors:door_wood"].on_place=function(itemstack, placer, pointed_thing)
-	local pos = pointed_thing.above
-	if protector.can_interact(protector.radius, pos,placer) then
-		return old_doors_on_place(itemstack, placer, pointed_thing)
-	else
-		return itemstack
-	end
-end
-local old_doors_on_place=minetest.registered_craftitems["doors:door_steel"].on_place
-minetest.registered_craftitems["doors:door_steel"].on_place=function(itemstack, placer, pointed_thing)
-	local pos = pointed_thing.above
-	if protector.can_interact(protector.radius, pos,placer) then
-		return old_doors_on_place(itemstack, placer, pointed_thing)
-	else
-		return itemstack
-	end
-end
---shaking the bag
-local old_doors_on_rightclick_b_1=minetest.registered_nodes["doors:door_wood_b_1"].on_rightclick
-minetest.registered_nodes["doors:door_wood_b_1"].on_rightclick=function(pos, node, clicker)
-	if protector.can_interact(protector.radius, pos,clicker) then
-		return old_doors_on_rightclick_b_1(pos, node, clicker)
-	else
-		return
-	end
-end
-local old_doors_on_rightclick_t_1=minetest.registered_nodes["doors:door_wood_t_1"].on_rightclick
-minetest.registered_nodes["doors:door_wood_t_1"].on_rightclick=function(pos, node, clicker)
-	if protector.can_interact(protector.radius, pos,clicker) then
-		return old_doors_on_rightclick_t_1(pos, node, clicker)
-	else
-		return
-	end
-end
-local old_doors_on_rightclick_b_2=minetest.registered_nodes["doors:door_wood_b_2"].on_rightclick
-minetest.registered_nodes["doors:door_wood_b_2"].on_rightclick=function(pos, node, clicker)
-	if protector.can_interact(protector.radius, pos,clicker) then
-		return old_doors_on_rightclick_b_2(pos, node, clicker)
-	else
-		return
-	end
-end
-local old_doors_on_rightclick_t_2=minetest.registered_nodes["doors:door_wood_t_2"].on_rightclick
-minetest.registered_nodes["doors:door_wood_t_2"].on_rightclick=function(pos, node, clicker)
-	if protector.can_interact(protector.radius, pos,clicker) then
-		return old_doors_on_rightclick_t_2(pos, node, clicker)
-	else
-		return
-	end
-end
---shaking the bag with screwdriver
-local old_screwdriver_on_use=minetest.registered_tools["screwdriver:screwdriver"].on_use
-minetest.registered_tools["screwdriver:screwdriver"].on_use=function(itemstack, user, pointed_thing)
-	local pos = pointed_thing.under
-	if pos==nil then
-		return itemstack
-	end
-	if protector.can_interact(protector.radius, pos,user) then
-		return old_screwdriver_on_use(itemstack, user, pointed_thing)
-	else
-		return itemstack
-	end
-end
-for i = 1, 4 do
-	local old_screwdriver_on_use=minetest.registered_tools["screwdriver:screwdriver"..i].on_use
-	minetest.registered_tools["screwdriver:screwdriver"..i].on_use=function(itemstack, user, pointed_thing)
-		local pos = pointed_thing.under
-		if pos==nil then
-			return itemstack
-		end
-		if protector.can_interact(protector.radius, pos,user) then
-			return old_screwdriver_on_use(itemstack, user, pointed_thing)
-		else
-			return itemstack
-		end
-	end
-end
---duck punching with bucket
-local old_bucket_on_use=minetest.registered_craftitems["bucket:bucket_empty"].on_use
-minetest.registered_craftitems["bucket:bucket_empty"].on_use=function(itemstack, placer, pointed_thing)
-	local pos = pointed_thing.above
-	if pos==nil then
-		return itemstack
-	end
-	if protector.can_interact(protector.radius+1, pos,placer) then
-		return old_bucket_on_use(itemstack, placer, pointed_thing)
-	else
-		return itemstack
-	end
-end
-local old_bucket_water_on_place=minetest.registered_craftitems["bucket:bucket_water"].on_place
-minetest.registered_craftitems["bucket:bucket_water"].on_place=function(itemstack, placer, pointed_thing)
-	local pos = pointed_thing.above
-	if protector.can_interact(protector.radius+1, pos,placer) then
-		return old_bucket_water_on_place(itemstack, placer, pointed_thing)
-	else
-		return itemstack
-	end
-end
-local old_bucket_lava_on_place=minetest.registered_craftitems["bucket:bucket_lava"].on_place
-minetest.registered_craftitems["bucket:bucket_lava"].on_place=function(itemstack, placer, pointed_thing)
-	local pos = pointed_thing.above
-	if protector.can_interact(protector.radius+1, pos,placer) then
-		return old_bucket_lava_on_place(itemstack, placer, pointed_thing)
-	else
-		return itemstack
-	end
-end
 
+if doors then
+    --for old doors mod, 
+    local old_doors_on_place=minetest.registered_craftitems["doors:door_wood"].on_place
+    minetest.registered_craftitems["doors:door_wood"].on_place=function(itemstack, placer, pointed_thing)
+        local pos = pointed_thing.above
+        if protector.can_interact(protector.radius, pos,placer) then
+            return old_doors_on_place(itemstack, placer, pointed_thing)
+        else
+            return itemstack
+        end
+    end
+    local old_doors_on_place=minetest.registered_craftitems["doors:door_steel"].on_place
+    minetest.registered_craftitems["doors:door_steel"].on_place=function(itemstack, placer, pointed_thing)
+        local pos = pointed_thing.above
+        if protector.can_interact(protector.radius, pos,placer) then
+            return old_doors_on_place(itemstack, placer, pointed_thing)
+        else
+            return itemstack
+        end
+    end
+    --shaking the bag
+    local old_doors_on_rightclick_b_1=minetest.registered_nodes["doors:door_wood_b_1"].on_rightclick
+    minetest.registered_nodes["doors:door_wood_b_1"].on_rightclick=function(pos, node, clicker)
+        if protector.can_interact(protector.radius, pos,clicker) then
+            return old_doors_on_rightclick_b_1(pos, node, clicker)
+        else
+            return
+        end
+    end
+    local old_doors_on_rightclick_t_1=minetest.registered_nodes["doors:door_wood_t_1"].on_rightclick
+    minetest.registered_nodes["doors:door_wood_t_1"].on_rightclick=function(pos, node, clicker)
+        if protector.can_interact(protector.radius, pos,clicker) then
+            return old_doors_on_rightclick_t_1(pos, node, clicker)
+        else
+            return
+        end
+    end
+    local old_doors_on_rightclick_b_2=minetest.registered_nodes["doors:door_wood_b_2"].on_rightclick
+    minetest.registered_nodes["doors:door_wood_b_2"].on_rightclick=function(pos, node, clicker)
+        if protector.can_interact(protector.radius, pos,clicker) then
+            return old_doors_on_rightclick_b_2(pos, node, clicker)
+        else
+            return
+        end
+    end
+    local old_doors_on_rightclick_t_2=minetest.registered_nodes["doors:door_wood_t_2"].on_rightclick
+    minetest.registered_nodes["doors:door_wood_t_2"].on_rightclick=function(pos, node, clicker)
+        if protector.can_interact(protector.radius, pos,clicker) then
+            return old_doors_on_rightclick_t_2(pos, node, clicker)
+        else
+            return
+        end
+    end
+end --end doors
+
+if minetest.registered_tools["screwdriver:screwdriver"] then
+    --for old screwdriver mod
+    local old_screwdriver_on_use=minetest.registered_tools["screwdriver:screwdriver"].on_use
+    minetest.registered_tools["screwdriver:screwdriver"].on_use=function(itemstack, user, pointed_thing)
+        local pos = pointed_thing.under
+        if pos==nil then
+            return itemstack
+        end
+        if protector.can_interact(protector.radius, pos,user) then
+            return old_screwdriver_on_use(itemstack, user, pointed_thing)
+        else
+            return itemstack
+        end
+    end
+    for i = 1, 4 do
+        local old_screwdriver_on_use=minetest.registered_tools["screwdriver:screwdriver"..i].on_use
+        minetest.registered_tools["screwdriver:screwdriver"..i].on_use=function(itemstack, user, pointed_thing)
+            local pos = pointed_thing.under
+            if pos==nil then
+                return itemstack
+            end
+            if protector.can_interact(protector.radius, pos,user) then
+                return old_screwdriver_on_use(itemstack, user, pointed_thing)
+            else
+                return itemstack
+            end
+        end
+    end
+end --screwdriver
+
+if bucket then
+    --for old bucket mod
+    local old_bucket_on_use=minetest.registered_craftitems["bucket:bucket_empty"].on_use
+    minetest.registered_craftitems["bucket:bucket_empty"].on_use=function(itemstack, placer, pointed_thing)
+        local pos = pointed_thing.above
+        if pos==nil then
+            return itemstack
+        end
+        if protector.can_interact(protector.radius+1, pos,placer) then
+            return old_bucket_on_use(itemstack, placer, pointed_thing)
+        else
+            return itemstack
+        end
+    end
+    local old_bucket_water_on_place=minetest.registered_craftitems["bucket:bucket_water"].on_place
+    minetest.registered_craftitems["bucket:bucket_water"].on_place=function(itemstack, placer, pointed_thing)
+        local pos = pointed_thing.above
+        if protector.can_interact(protector.radius+1, pos,placer) then
+            return old_bucket_water_on_place(itemstack, placer, pointed_thing)
+        else
+            return itemstack
+        end
+    end
+    local old_bucket_lava_on_place=minetest.registered_craftitems["bucket:bucket_lava"].on_place
+    minetest.registered_craftitems["bucket:bucket_lava"].on_place=function(itemstack, placer, pointed_thing)
+        local pos = pointed_thing.above
+        if protector.can_interact(protector.radius+1, pos,placer) then
+            return old_bucket_lava_on_place(itemstack, placer, pointed_thing)
+        else
+            return itemstack
+        end
+    end
+end --end bucket
+
+--protection against tnt!
+if minetest.registered_nodes["tnt:tnt"] then
+    local prot_tnt_radius_max = tonumber(minetest.setting_get("tnt_radius_max") or 25) + protector.radius
+    
+    local old_tnt_on_place = minetest.registered_nodes["tnt:tnt"].on_place
+    minetest.registered_nodes["tnt:tnt"].on_place = function(itemstack, placer, pointed_thing)
+        local pos = pointed_thing.above
+        if protector.can_interact(prot_tnt_radius_max, pos,placer) then
+            return old_tnt_on_place(itemstack, placer, pointed_thing)
+        else
+            return itemstack
+        end
+    end
+end --tnt
 
 
 --at least! normally owerride "is_protected"
 local old_is_protected = minetest.is_protected
 function minetest.is_protected(pos, name)
+    if protector.cache[name..minetest.pos_to_string(pos)] then
+        return true
+    end
     local ok = true
     local node = minetest.get_node(pos)
 	if node.name == "bones:bones" then
@@ -280,6 +307,7 @@ function minetest.is_protected(pos, name)
     if ok then
         return old_is_protected(pos, name)
     else
+        protector.cache[name..minetest.pos_to_string(pos)] = 1
         return true
 	end
 end
@@ -465,3 +493,13 @@ minetest.register_node(protector.display_node, {
 	groups = {dig_immediate=3,not_in_creative_inventory=1},
 	drop = "",
 })
+
+--clean protection cache
+local timer = 0
+minetest.register_globalstep(function(dtime)
+	timer = timer + dtime;
+	if timer >= 3 then
+        protector.cache = {}
+		timer = 0
+	end
+end)
