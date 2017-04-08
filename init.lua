@@ -17,6 +17,8 @@ protector.radius = (tonumber(minetest.setting_get("protector_radius")) or 3)
 protector.protectedspawnpos = (minetest.setting_get_pos("static_spawnpoint") or {x=0, y=3, z=0})
 
 protector.node = "protector_mese:protect"
+protector.node_b1 = "protector_mese:brazier_bronze"
+protector.node_b2 = "protector_mese:brazier_gold"
 protector.display = "protector_mese:display"
 protector.display_node = "protector_mese:display_node"
 protector.item = "protector_mese:stick"
@@ -119,7 +121,7 @@ protector.can_interact = function(r, pos, name, onlyowner, infolevel)
 	local positions = minetest.find_nodes_in_area(
 		{x=pos.x-r, y=pos.y-r, z=pos.z-r},
 		{x=pos.x+r, y=pos.y+r, z=pos.z+r},
-		protector.node)
+		{protector.node, protector.node_b1, protector.node_b2})
 	for _, pos in ipairs(positions) do
 		local meta = minetest.get_meta(pos)
 		local owner = meta:get_string("owner")
@@ -187,11 +189,23 @@ minetest.item_place = function(itemstack, placer, pointed_thing)
         local name = placer:get_player_name()
         minetest.log("action", "Player "..name.." placing "..itemname.." without pos");
         return itemstack
+
     elseif itemname == protector.node then
         if not protector.can_interact(protector.radius*2, pos, placer, true) then
             return itemstack
         end
-
+        if  protector.protectedspawnpos and
+            pos.x > protector.protectedspawnpos.x - 121 and pos.x < protector.protectedspawnpos.x + 121 and
+            pos.z > protector.protectedspawnpos.z - 121 and pos.z < protector.protectedspawnpos.z + 121 and
+            not minetest.get_player_privs(placer:get_player_name()).delprotect
+        then
+            minetest.chat_send_player(placer:get_player_name(), "Spawn belongs to all!")
+            return itemstack
+        end
+    elseif minetest.get_item_group(itemname, "protector") > 0 then
+        if not protector.can_interact(protector.radius*2, pos, placer, true) then
+            return itemstack
+        end
         if  protector.protectedspawnpos and
             pos.x > protector.protectedspawnpos.x - 21 and pos.x < protector.protectedspawnpos.x + 21 and
             pos.z > protector.protectedspawnpos.z - 21 and pos.z < protector.protectedspawnpos.z + 21 and
@@ -200,12 +214,7 @@ minetest.item_place = function(itemstack, placer, pointed_thing)
             minetest.chat_send_player(placer:get_player_name(), "Spawn belongs to all")
             return itemstack
         end
-    elseif
-        itemname == "default:sapling" or
-        itemname == "default:junglesapling" or
-        itemname == "default:pine_sapling" or
-        itemname == "default:acacia_sapling"
-    then
+    elseif minetest.get_item_group(itemname, "sapling") > 0 then
         pos = {x=pos.x, y=pos.y+5, z=pos.z}
         if not protector.can_interact(protector.radius, pos, placer) then
             return itemstack
@@ -247,7 +256,7 @@ minetest.register_node(protector.node, {
 	description = "Protection",
 	tiles = {"protector_top.png","protector_top.png","protector_side.png"},
 	sounds = default.node_sound_stone_defaults(),
-	groups = {dig_immediate=2},
+	groups = {dig_immediate=2, protector=1},
 	drawtype = "nodebox",
 	node_box = {
 		type="fixed",
@@ -291,16 +300,211 @@ minetest.register_node(protector.node, {
 		end
 	end,
 })
--- remove formspecs from older versions of the mod
---minetest.register_abm({
---	nodenames = {protector.node},
---	interval = 5.0,
---	chance = 1,
---	action = function(pos,...)
---		local meta = minetest.get_meta(pos)
---		meta:set_string("formspec","")
---	end,
---})
+
+minetest.register_node(protector.node_b1, {
+	description = "Protection bronze brazier",
+    drawtype = "plantlike",
+	tiles = {
+        {
+            name = "protector_brazier_bronze_animated.png",
+            animation = {
+                type = "vertical_frames",
+                aspect_w = 16,
+                aspect_h = 16,
+                length = 3.0
+            },
+        }
+    },
+    inventory_image = "protector_brazier_bronze.png",
+    wield_image = "protector_brazier_bronze.png",
+	sounds = default.node_sound_stone_defaults(),
+	groups = {dig_immediate=2, protector=1},
+	node_box = {
+		type="fixed",
+		fixed = { -0.4, -0.5, -0.4, 0.4, -0.2, 0.4 },
+	},
+	selection_box = {
+		type="fixed",
+		fixed = { -0.4, -0.5, -0.4, 0.4, -0.2, 0.4 },
+	},
+    sunlight_propagates = true,
+    is_ground_content = false,
+    paramtype = "light",
+    light_source = default.LIGHT_MAX - 1,
+	after_place_node = function(pos, placer)
+		local meta = minetest.get_meta(pos)
+		meta:set_string("owner", placer:get_player_name() or "")
+		meta:set_string("infotext", "Protection (owned by "..
+				meta:get_string("owner")..")")
+		meta:set_string("members", "")
+		--meta:set_string("formspec",protector.generate_formspec(meta))
+	end,
+	on_rightclick = function(pos, node, clicker, itemstack)
+		local meta = minetest.get_meta(pos)
+		if protector.can_interact(1,pos,clicker,true) then
+			minetest.show_formspec(
+				clicker:get_player_name(),
+				"protector_"..minetest.pos_to_string(pos),
+				protector.generate_formspec(meta)
+			)
+		end
+	end,
+	on_punch = function(pos, node, puncher)
+		if not protector.can_interact(1,pos,puncher,true) then
+			return
+		end
+		local objs = minetest.get_objects_inside_radius(pos,.5) -- a radius of .5 since the entity serialization seems to be not that precise
+		local removed = false
+
+		for _, o in pairs(objs) do
+			if o and not o:is_player() and o:get_luaentity().name == protector.display then
+				o:remove()
+				removed = true
+			end
+		end
+		if not removed then -- nothing was removed: there wasn't the entity
+			minetest.add_entity(pos, protector.display)
+		end
+	end,
+    on_construct = function(pos)
+        minetest.get_node_timer(pos):start(86400)
+    end,
+    on_timer = function(pos, elapsed)
+        local meta = minetest.get_meta(pos)
+		meta:set_string("infotext", "Extinct brazier")
+        minetest.swap_node(pos, {name=protector.node_b1.."_extinct"});
+        return false
+    end,
+})
+
+minetest.register_node(protector.node_b1.."_extinct", {
+	description = "Extinct bronze brazier",
+    drawtype = "plantlike",
+	tiles = {
+        {
+            name = "extinct_brazier_bronze.png",
+        }
+    },
+    inventory_image = "extinct_brazier_bronze.png",
+    wield_image = "extinct_brazier_bronze.png",
+	sounds = default.node_sound_stone_defaults(),
+	groups = {dig_immediate=2,},
+	node_box = {
+		type="fixed",
+		fixed = { -0.4, -0.5, -0.4, 0.4, -0.2, 0.4 },
+	},
+	selection_box = {
+		type="fixed",
+		fixed = { -0.4, -0.5, -0.4, 0.4, -0.2, 0.4 },
+	},
+    sunlight_propagates = true,
+    is_ground_content = false,
+    paramtype = "light",
+    light_source = 1,
+})
+
+minetest.register_node(protector.node_b2, {
+	description = "Protection golden brazier",
+    drawtype = "plantlike",
+	tiles = {
+        {
+            name = "protector_brazier_gold_animated.png",
+            animation = {
+                type = "vertical_frames",
+                aspect_w = 16,
+                aspect_h = 16,
+                length = 3.0
+            },
+        }
+    },
+    inventory_image = "protector_brazier_gold.png",
+    wield_image = "protector_brazier_gold.png",
+	sounds = default.node_sound_stone_defaults(),
+	groups = {dig_immediate=2, protector=1},
+	node_box = {
+		type="fixed",
+		fixed = { -0.4, -0.5, -0.4, 0.4, -0.2, 0.4 },
+	},
+	selection_box = {
+		type="fixed",
+		fixed = { -0.4, -0.5, -0.4, 0.4, -0.2, 0.4 },
+	},
+    sunlight_propagates = true,
+    is_ground_content = false,
+    paramtype = "light",
+    light_source = default.LIGHT_MAX,
+	after_place_node = function(pos, placer)
+		local meta = minetest.get_meta(pos)
+		meta:set_string("owner", placer:get_player_name() or "")
+		meta:set_string("infotext", "Protection (owned by "..
+				meta:get_string("owner")..")")
+		meta:set_string("members", "")
+		--meta:set_string("formspec",protector.generate_formspec(meta))
+	end,
+	on_rightclick = function(pos, node, clicker, itemstack)
+		local meta = minetest.get_meta(pos)
+		if protector.can_interact(1,pos,clicker,true) then
+			minetest.show_formspec(
+				clicker:get_player_name(),
+				"protector_"..minetest.pos_to_string(pos),
+				protector.generate_formspec(meta)
+			)
+		end
+	end,
+	on_punch = function(pos, node, puncher)
+		if not protector.can_interact(1,pos,puncher,true) then
+			return
+		end
+		local objs = minetest.get_objects_inside_radius(pos,.5) -- a radius of .5 since the entity serialization seems to be not that precise
+		local removed = false
+
+		for _, o in pairs(objs) do
+			if o and not o:is_player() and o:get_luaentity().name == protector.display then
+				o:remove()
+				removed = true
+			end
+		end
+		if not removed then -- nothing was removed: there wasn't the entity
+			minetest.add_entity(pos, protector.display)
+		end
+	end,
+    on_construct = function(pos)
+        minetest.get_node_timer(pos):start(604800)
+    end,
+    on_timer = function(pos, elapsed)
+        local meta = minetest.get_meta(pos)
+		meta:set_string("infotext", "Extinct brazier")
+        minetest.swap_node(pos, {name=protector.node_b2.."_extinct"})
+        return false
+    end,
+})
+
+minetest.register_node(protector.node_b2.."_extinct", {
+	description = "Extinct golden brazier",
+    drawtype = "plantlike",
+	tiles = {
+        {
+            name = "extinct_brazier_gold.png",
+        }
+    },
+    inventory_image = "extinct_brazier_gold.png",
+    wield_image = "extinct_brazier_gold.png",
+	sounds = default.node_sound_stone_defaults(),
+	groups = {dig_immediate=2, },
+	node_box = {
+		type="fixed",
+		fixed = { -0.4, -0.5, -0.4, 0.4, -0.2, 0.4 },
+	},
+	selection_box = {
+		type="fixed",
+		fixed = { -0.4, -0.5, -0.4, 0.4, -0.2, 0.4 },
+	},
+    sunlight_propagates = true,
+    is_ground_content = false,
+    paramtype = "light",
+    light_source = 1,
+})
+
 minetest.register_on_player_receive_fields(function(player,formname,fields)
 	if string.sub(formname,0,string.len("protector_")) == "protector_" then
 		local pos_s = string.sub(formname,string.len("protector_")+1)
@@ -367,6 +571,37 @@ minetest.register_craft({
 	}
 })
 
+minetest.register_craft({
+	output = protector.node_b1,
+	recipe = {
+		{"","",""},
+		{"default:bronze_ingot","default:coal_lump","default:bronze_ingot"},
+		{"","default:bronze_ingot",""},
+	}
+})
+minetest.register_craft({
+	output = protector.node_b1,
+	recipe = {
+        {'default:coal_lump'},
+		{protector.node_b1.."_extinct"},
+	}
+})
+minetest.register_craft({
+	output = protector.node_b2,
+	recipe = {
+		{"","",""},
+		{"default:gold_ingot","default:coalblock","default:gold_ingot"},
+		{"","default:gold_ingot",""},
+	}
+})
+minetest.register_craft({
+	output = protector.node_b2,
+	recipe = {
+        {'default:coalblock'},
+		{protector.node_b2.."_extinct"},
+	}
+})
+
 minetest.register_entity(protector.display, {
 	physical = false,
 	collisionbox = {0,0,0,0,0,0},
@@ -424,3 +659,22 @@ minetest.register_globalstep(function(dtime)
 		timer = 0
 	end
 end)
+
+minetest.register_abm{
+	nodenames = {protector.node_b1, protector.node_b2},
+	interval = 600,
+	chance = 1,
+	action = function(pos)
+        local timeout = minetest.get_node_timer(pos):get_timeout();
+        if timeout > 0 then
+            local elapsed = minetest.get_node_timer(pos):get_elapsed();
+            local hours_left = math.floor((timeout - elapsed) / 3600);
+            local meta = minetest.get_meta(pos)
+    		meta:set_string("infotext", "Protection (owned by "..
+    				meta:get_string("owner")..")"..". Less than "..hours_left.."h left.")
+        else
+            local meta = minetest.get_meta(pos)
+    		meta:set_string("infotext", "Protection (owned by "..meta:get_string("owner")..")")
+        end
+	end,
+}
