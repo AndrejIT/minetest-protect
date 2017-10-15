@@ -90,6 +90,50 @@ protector.generate_formspec = function (meta)
 	return formspec
 end
 
+protector.generate_formspec_brazier = function (meta, pos)
+	local formspec = "size[8,10]"
+		.."label[0,0;-- protector interface --]"
+		.."label[0,1;Punch the node to show the protected area.]"
+		.."label[0,2;Current members:]"
+	local members = protector.get_member_list(meta)
+
+	local npp = 15 -- names per page, for the moment is 4*4 (-1 for the + button)
+	--no pages. 15 members max
+	local i = 0
+	for _, member in ipairs(members) do
+		if i < 15 then
+			formspec = formspec .. "button["..(i%4*2)..","..math.floor(i/4+3)..";1.5,.5;protector_member;"..member.."]"
+			formspec = formspec .. "button["..(i%4*2+1.25)..","..math.floor(i/4+3)..";.75,.5;protector_del_member_"..member..";X]"
+		end
+		i = i +1
+	end
+	if i < npp then
+        local spos = pos.x .. "," ..pos.y .. "," .. pos.z
+		formspec = formspec
+			.."field["..(i%4*2+1/3)..","..(math.floor(i/4+3)+1/3)..";1.433,.5;protector_add_member;;]"
+
+            .."list[nodemeta:" .. spos .. ";fuel;3.5,8.25;1,1;]"..
+            "list[current_player;main;0,9.25;8,1;]"
+			.."button["..(i%4*2+1.25)..","..math.floor(i/4+3)..";.75,.5;protector_submit;+]"
+	end
+
+	formspec = formspec .. "button_exit[1,7;3,1;protector_close;CLOSE]"
+
+	return formspec
+end
+
+protector.generate_formspec_brazier_public = function (meta, pos)
+	local formspec = "size[8,3]"
+
+    local spos = pos.x .. "," ..pos.y .. "," .. pos.z
+	formspec = formspec..
+        "list[nodemeta:" .. spos .. ";fuel;3.5,0.25;1,1;]"..
+        "list[current_player;main;0,1.25;8,1;]"
+	formspec = formspec .. "button_exit[1,2;3,1;protector_close;CLOSE]"
+
+	return formspec
+end
+
 -- r: radius to check for protects
 -- Infolevel:
 -- * 0 for no info
@@ -345,10 +389,50 @@ minetest.register_node(protector.node_b1, {
 			minetest.show_formspec(
 				clicker:get_player_name(),
 				"protector_"..minetest.pos_to_string(pos),
-				protector.generate_formspec(meta)
+				protector.generate_formspec_brazier(meta, pos)
 			)
+        else
+        	minetest.show_formspec(
+    			clicker:get_player_name(),
+    			"protector_"..minetest.pos_to_string(pos),
+    			protector.generate_formspec_brazier_public(meta, pos)
+    		)
 		end
 	end,
+    on_metadata_inventory_put = function(pos, listname, index, stack, player)
+        if listname == "fuel" then
+            local inv = minetest.get_meta(pos):get_inventory()
+            if inv:get_size('fuel') > 0 then
+                local itemstack = inv:remove_item("fuel", stack)
+                local name = itemstack:get_name()
+                if name == 'default:coal_lump' or name == 'default:coalblock' or name == 'asphalt:bucket_oil' then
+                    local timer = minetest.get_node_timer(pos)
+                    local timeout = timer:get_timeout()
+                    local elapsed = timer:get_elapsed()
+                    local time_left = timeout - elapsed
+                    if timeout > 0 and time_left > 1 and time_left < 86400 then
+                        local timeadd = 0
+                        if name == 'default:coal_lump' then
+                            timeadd = 86400
+                        elseif name == 'default:coalblock' then
+                            timeadd = 604800
+                        elseif name == 'asphalt:bucket_oil' then
+                            timeadd = 2419200
+                        end
+                        timer:start(time_left + timeadd)
+                        local hours_left = math.floor((time_left + timeadd) / 3600);
+                        local meta = minetest.get_meta(pos)
+                        meta:set_string("infotext", "Protection (owned by "..
+                            meta:get_string("owner")..")"..". Less than "..hours_left.."h left.")
+                    else
+                        minetest.add_item(pos, itemstack)
+                    end
+                else
+                    minetest.add_item(pos, itemstack)
+                end
+            end
+        end
+    end,
 	on_punch = function(pos, node, puncher)
 		if not protector.can_interact(1,pos,puncher,true) then
 			return
@@ -368,6 +452,9 @@ minetest.register_node(protector.node_b1, {
 	end,
     on_construct = function(pos)
         minetest.get_node_timer(pos):start(86400)
+        local meta = minetest.get_meta(pos)
+        local inv = meta:get_inventory()
+        inv:set_size('fuel', 1)
     end,
     on_timer = function(pos, elapsed)
         local meta = minetest.get_meta(pos)
@@ -447,10 +534,50 @@ minetest.register_node(protector.node_b2, {
 			minetest.show_formspec(
 				clicker:get_player_name(),
 				"protector_"..minetest.pos_to_string(pos),
-				protector.generate_formspec(meta)
+				protector.generate_formspec_brazier(meta, pos)
 			)
+        else
+        	minetest.show_formspec(
+    			clicker:get_player_name(),
+    			"protector_"..minetest.pos_to_string(pos),
+    			protector.generate_formspec_brazier_public(meta, pos)
+    		)
 		end
 	end,
+    on_metadata_inventory_put = function(pos, listname, index, stack, player)
+        if listname == "fuel" then
+            local inv = minetest.get_meta(pos):get_inventory()
+            if inv:get_size('fuel') > 0 then
+                local itemstack = inv:remove_item("fuel", stack)
+                local name = itemstack:get_name()
+                if name == 'default:coal_lump' or name == 'default:coalblock' or name == 'asphalt:bucket_oil' then
+                    local timer = minetest.get_node_timer(pos)
+                    local timeout = timer:get_timeout()
+                    local elapsed = timer:get_elapsed()
+                    local time_left = timeout - elapsed
+                    if timeout > 0 and time_left > 1 and time_left < 604800 then
+                        local timeadd = 0
+                        if name == 'default:coal_lump' then
+                            timeadd = 86400
+                        elseif name == 'default:coalblock' then
+                            timeadd = 604800
+                        elseif name == 'asphalt:bucket_oil' then
+                            timeadd = 2419200
+                        end
+                        timer:start(time_left + timeadd)
+                        local hours_left = math.floor((time_left + timeadd) / 3600);
+                        local meta = minetest.get_meta(pos)
+                        meta:set_string("infotext", "Protection (owned by "..
+                            meta:get_string("owner")..")"..". Less than "..hours_left.."h left.")
+                    else
+                        minetest.add_item(pos, itemstack)
+                    end
+                else
+                    minetest.add_item(pos, itemstack)
+                end
+            end
+        end
+    end,
 	on_punch = function(pos, node, puncher)
 		if not protector.can_interact(1,pos,puncher,true) then
 			return
@@ -470,6 +597,9 @@ minetest.register_node(protector.node_b2, {
 	end,
     on_construct = function(pos)
         minetest.get_node_timer(pos):start(604800)
+        local meta = minetest.get_meta(pos)
+        local inv = meta:get_inventory()
+        inv:set_size('fuel', 1)
     end,
     on_timer = function(pos, elapsed)
         local meta = minetest.get_meta(pos)
