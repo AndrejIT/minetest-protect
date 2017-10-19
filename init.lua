@@ -417,7 +417,8 @@ minetest.register_node(protector.node_b1, {
                         elseif name == 'default:coalblock' then
                             timeadd = 604800
                         elseif name == 'asphalt:bucket_oil' then
-                            timeadd = 2419200
+                            --timeadd = 2419200     -- timer  cannot store such a big numbers
+                            timeadd = 1209600
                         end
                         timer:start(time_left + timeadd)
                         local hours_left = math.floor((time_left + timeadd) / 3600);
@@ -562,7 +563,8 @@ minetest.register_node(protector.node_b2, {
                         elseif name == 'default:coalblock' then
                             timeadd = 604800
                         elseif name == 'asphalt:bucket_oil' then
-                            timeadd = 2419200
+                            --timeadd = 2419200     -- timer  cannot store such a big numbers
+                            timeadd = 1209600
                         end
                         timer:start(time_left + timeadd)
                         local hours_left = math.floor((time_left + timeadd) / 3600);
