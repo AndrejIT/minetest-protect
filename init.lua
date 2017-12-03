@@ -415,7 +415,7 @@ minetest.register_node(protector.node_b1, {
                         if name == 'default:coal_lump' then
                             timeadd = 86400
                         elseif name == 'default:coalblock' then
-                            timeadd = 604800
+                            timeadd = 691200    -- 8 days
                         elseif name == 'asphalt:bucket_oil' then
                             --timeadd = 2419200     -- timer  cannot store such a big numbers
                             timeadd = 1209600
@@ -556,12 +556,12 @@ minetest.register_node(protector.node_b2, {
                     local timeout = timer:get_timeout()
                     local elapsed = timer:get_elapsed()
                     local time_left = timeout - elapsed
-                    if timeout > 0 and time_left > 1 and time_left < 604800 then
+                    if timeout > 0 and time_left > 1 and time_left < 691200 then
                         local timeadd = 0
                         if name == 'default:coal_lump' then
                             timeadd = 86400
                         elseif name == 'default:coalblock' then
-                            timeadd = 604800
+                            timeadd = 691200    -- 8 days
                         elseif name == 'asphalt:bucket_oil' then
                             --timeadd = 2419200     -- timer  cannot store such a big numbers
                             timeadd = 1209600
@@ -598,7 +598,7 @@ minetest.register_node(protector.node_b2, {
 		end
 	end,
     on_construct = function(pos)
-        minetest.get_node_timer(pos):start(604800)
+        minetest.get_node_timer(pos):start(691200)  -- 8 days
         local meta = minetest.get_meta(pos)
         local inv = meta:get_inventory()
         inv:set_size('fuel', 1)
